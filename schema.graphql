@@ -1,0 +1,28 @@
+# GraphQL Schema for Air Quality API
+
+input AirQualityInput {
+  latitude: Float!
+  longitude: Float!
+}
+
+type CurrentAirQuality {
+  time: String!
+  usAqi: Int
+  pm10: Float
+  pm25: Float
+}
+
+type AirQuality {
+  latitude: Float!
+  longitude: Float!
+  current: CurrentAirQuality
+}
+
+type Query {
+  getAirQuality(input: AirQualityInput!): AirQuality
+}
+
+schema {
+  query: Query
+}
+

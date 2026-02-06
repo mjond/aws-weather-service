@@ -1,0 +1,39 @@
+*.js
+!jest.config.js
+*.d.ts
+node_modules
+
+# CDK asset staging directory
+.cdk.staging
+cdk.out
+
+# Environment variables and secrets
+.env
+.env.local
+.env.*.local
+*.env
+
+# API keys and sensitive configuration
+config.json
+secrets.json
+*.key
+*.pem
+
+# AWS credentials (if you store them locally - NOT RECOMMENDED)
+.aws/
+aws-credentials
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Documentation files (moved elsewhere)
+LEARNING.md
+DEPLOYMENT.md
