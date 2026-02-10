@@ -1,12 +1,10 @@
 // Lambda handler for AppSync GraphQL API
-import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import { DynamoDBDocumentClient, GetCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
-
-const dynamoClient = new DynamoDBClient({});
-const docClient = DynamoDBDocumentClient.from(dynamoClient);
-
-const CACHE_TABLE_NAME = process.env.CACHE_TABLE_NAME!;
-const CACHE_TTL_SECONDS = parseInt(process.env.CACHE_TTL_SECONDS || "3600", 10);
+import {
+  AirQualityData,
+  createCacheKey,
+  getCachedData,
+  setCachedData,
+} from "../repositories/cache";
 
 interface AirQualityInput {
   latitude: number;
@@ -22,17 +20,6 @@ interface OpenMeteoResponse {
     us_aqi?: number;
     pm10?: number;
     pm2_5?: number;
-  };
-}
-
-interface AirQualityData {
-  latitude: number;
-  longitude: number;
-  current?: {
-    time: string;
-    usAqi?: number;
-    pm10?: number;
-    pm25?: number;
   };
 }
 
@@ -53,60 +40,6 @@ interface AppSyncEvent {
     fieldName?: string;
     variables?: Record<string, any>;
   };
-}
-
-// Helper function to create cache key from latitude and longitude
-function createCacheKey(latitude: number, longitude: number): string {
-  // Round to 2 decimal places for cache key (approximately 1km precision)
-  const lat = Math.round(latitude * 100) / 100;
-  const lon = Math.round(longitude * 100) / 100;
-  return `${lat},${lon}`;
-}
-
-// Helper function to get cached data
-async function getCachedData(locationKey: string): Promise<AirQualityData | null> {
-  try {
-    const result = await docClient.send(
-      new GetCommand({
-        TableName: CACHE_TABLE_NAME,
-        Key: { locationKey },
-      })
-    );
-
-    if (result.Item && result.Item.data) {
-      console.log(`Cache hit for location: ${locationKey}`);
-      return result.Item.data as AirQualityData;
-    }
-
-    console.log(`Cache miss for location: ${locationKey}`);
-    return null;
-  } catch (error) {
-    console.error("Error reading from cache:", error);
-    return null; // On cache error, proceed to fetch from API
-  }
-}
-
-// Helper function to store data in cache
-async function setCachedData(locationKey: string, data: AirQualityData): Promise<void> {
-  try {
-    const ttl = Math.floor(Date.now() / 1000) + CACHE_TTL_SECONDS;
-
-    await docClient.send(
-      new PutCommand({
-        TableName: CACHE_TABLE_NAME,
-        Item: {
-          locationKey,
-          data,
-          ttl,
-        },
-      })
-    );
-
-    console.log(`Cached data for location: ${locationKey} (expires in ${CACHE_TTL_SECONDS}s)`);
-  } catch (error) {
-    console.error("Error writing to cache:", error);
-    // Don't throw - caching is best effort
-  }
 }
 
 // Helper function to build API URL with parameters
