@@ -33,7 +33,3 @@ aws-credentials
 # OS files
 .DS_Store
 Thumbs.db
-
-# Documentation files (moved elsewhere)
-LEARNING.md
-DEPLOYMENT.md

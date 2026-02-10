@@ -1,6 +1,7 @@
 import * as cdk from "aws-cdk-lib";
 import { Construct } from "constructs";
 import * as appsync from "aws-cdk-lib/aws-appsync";
+import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as lambdaNodejs from "aws-cdk-lib/aws-lambda-nodejs";
 import * as path from "path";
@@ -8,6 +9,16 @@ import * as path from "path";
 export class AwsWeatherServiceStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
+
+    // DynamoDB table for caching air quality data
+    // Uses composite key (latitude + longitude) and TTL for automatic expiration
+    const cacheTable = new dynamodb.Table(this, "AirQualityCache", {
+      tableName: "air-quality-cache",
+      partitionKey: { name: "locationKey", type: dynamodb.AttributeType.STRING },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      timeToLiveAttribute: "ttl",
+      removalPolicy: cdk.RemovalPolicy.DESTROY, // For dev/testing - change for production
+    });
 
     // Lambda function to fetch air quality data from Open-Meteo API
     const getAirQualityLambda = new lambdaNodejs.NodejsFunction(
@@ -19,13 +30,18 @@ export class AwsWeatherServiceStack extends cdk.Stack {
         entry: path.join(__dirname, "../lambda/getAirQuality.ts"),
         timeout: cdk.Duration.seconds(30),
         memorySize: 256,
+        environment: {
+          CACHE_TABLE_NAME: cacheTable.tableName,
+          CACHE_TTL_SECONDS: "3600", // 1 hour cache expiration
+        },
         bundling: {
-          // Use local bundling if Docker is not available
-          // This requires esbuild to be installed: npm install -D esbuild
           forceDockerBundling: false,
         },
       }
     );
+
+    // Grant Lambda permissions to read/write to DynamoDB cache table
+    cacheTable.grantReadWriteData(getAirQualityLambda);
 
     // AppSync GraphQL API
     const api = new appsync.GraphqlApi(this, "AirQualityApi", {
