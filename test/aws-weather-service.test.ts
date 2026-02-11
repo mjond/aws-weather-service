@@ -1,8 +1,6 @@
-// import * as cdk from 'aws-cdk-lib';
-// import { Template } from 'aws-cdk-lib/assertions';
-// import * as AwsWeatherService from '../lib/aws-weather-service-stack';
+// CDK Stack tests can be added here in the future
+// Example: Testing CloudFormation template generation
 
-test('Placeholder test', () => {
-  // Tests to be implemented
+test("Placeholder for CDK stack tests", () => {
   expect(true).toBe(true);
 });
