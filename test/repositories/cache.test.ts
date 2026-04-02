@@ -32,6 +32,7 @@ import {
   createCacheKey,
   getCachedData,
   setCachedData,
+  resolveForecastDays,
   AirQualityData,
 } from "../../repositories/cache";
 
@@ -58,21 +59,42 @@ describe("Cache Repository", () => {
 
   describe("createCacheKey", () => {
     it("should round coordinates to 2 decimal places", () => {
-      expect(createCacheKey(40.7128, -74.0060)).toBe("40.71,-74.01");
+      expect(createCacheKey(40.7128, -74.0060)).toBe("40.71,-74.01,7");
     });
 
     it("should handle exact coordinates", () => {
-      expect(createCacheKey(40.71, -74.01)).toBe("40.71,-74.01");
+      expect(createCacheKey(40.71, -74.01)).toBe("40.71,-74.01,7");
     });
 
     it("should handle negative coordinates", () => {
-      expect(createCacheKey(-33.8688, 151.2093)).toBe("-33.87,151.21");
+      expect(createCacheKey(-33.8688, 151.2093)).toBe("-33.87,151.21,7");
     });
 
     it("should create same key for nearby coordinates", () => {
       const key1 = createCacheKey(40.7128, -74.0060);
       const key2 = createCacheKey(40.7129, -74.0061);
       expect(key1).toBe(key2);
+    });
+
+    it("should include forecast days in the key", () => {
+      expect(createCacheKey(40.71, -74.01, 3)).toBe("40.71,-74.01,3");
+    });
+
+    it("should clamp forecast days to Open-Meteo max", () => {
+      expect(createCacheKey(40.71, -74.01, 99)).toBe("40.71,-74.01,7");
+    });
+  });
+
+  describe("resolveForecastDays", () => {
+    it("should default null and undefined to 7", () => {
+      expect(resolveForecastDays(null)).toBe(7);
+      expect(resolveForecastDays(undefined)).toBe(7);
+    });
+
+    it("should clamp and floor values", () => {
+      expect(resolveForecastDays(3.9)).toBe(3);
+      expect(resolveForecastDays(-1)).toBe(0);
+      expect(resolveForecastDays(100)).toBe(7);
     });
   });
 
@@ -90,10 +112,10 @@ describe("Cache Repository", () => {
       };
 
       mockSend.mockResolvedValue({
-        Item: { locationKey: "40.71,-74.01", data: mockData },
+        Item: { locationKey: "40.71,-74.01,7", data: mockData },
       });
 
-      const result = await getCachedData("40.71,-74.01");
+      const result = await getCachedData("40.71,-74.01,7");
 
       expect(result).toEqual(mockData);
       expect(mockSend).toHaveBeenCalledTimes(1);
@@ -105,17 +127,17 @@ describe("Cache Repository", () => {
     it("should return null when item does not exist", async () => {
       mockSend.mockResolvedValue({ Item: undefined });
 
-      const result = await getCachedData("40.71,-74.01");
+      const result = await getCachedData("40.71,-74.01,7");
 
       expect(result).toBeNull();
     });
 
     it("should return null when item exists but has no data", async () => {
       mockSend.mockResolvedValue({
-        Item: { locationKey: "40.71,-74.01" },
+        Item: { locationKey: "40.71,-74.01,7" },
       });
 
-      const result = await getCachedData("40.71,-74.01");
+      const result = await getCachedData("40.71,-74.01,7");
 
       expect(result).toBeNull();
     });
@@ -123,7 +145,7 @@ describe("Cache Repository", () => {
     it("should return null on DynamoDB error", async () => {
       mockSend.mockRejectedValue(new Error("DynamoDB error"));
 
-      const result = await getCachedData("40.71,-74.01");
+      const result = await getCachedData("40.71,-74.01,7");
 
       expect(result).toBeNull();
     });
@@ -145,7 +167,7 @@ describe("Cache Repository", () => {
       mockSend.mockResolvedValue({});
 
       const beforeTime = Math.floor(Date.now() / 1000);
-      await setCachedData("40.71,-74.01", mockData);
+      await setCachedData("40.71,-74.01,7", mockData);
       const afterTime = Math.floor(Date.now() / 1000);
 
       expect(mockSend).toHaveBeenCalledTimes(1);
@@ -164,7 +186,7 @@ describe("Cache Repository", () => {
 
       mockSend.mockRejectedValue(new Error("DynamoDB error"));
 
-      await expect(setCachedData("40.71,-74.01", mockData)).resolves.not.toThrow();
+      await expect(setCachedData("40.71,-74.01,7", mockData)).resolves.not.toThrow();
     });
   });
 });
