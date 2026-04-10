@@ -1,7 +1,9 @@
 import * as cdk from "aws-cdk-lib";
 import { Construct } from "constructs";
 import * as appsync from "aws-cdk-lib/aws-appsync";
+import * as cognito from "aws-cdk-lib/aws-cognito";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
+import * as iam from "aws-cdk-lib/aws-iam";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as lambdaNodejs from "aws-cdk-lib/aws-lambda-nodejs";
 import * as path from "path";
@@ -51,10 +53,7 @@ export class AwsWeatherServiceStack extends cdk.Stack {
       ),
       authorizationConfig: {
         defaultAuthorization: {
-          authorizationType: appsync.AuthorizationType.API_KEY,
-          apiKeyConfig: {
-            expires: cdk.Expiration.after(cdk.Duration.days(365)),
-          },
+          authorizationType: appsync.AuthorizationType.IAM,
         },
       },
       logConfig: {
@@ -74,15 +73,61 @@ export class AwsWeatherServiceStack extends cdk.Stack {
       fieldName: "getAirQuality",
     });
 
-    // Output API URL and key
+    // Cognito Identity Pool for guest (unauthenticated) mobile access.
+    const identityPool = new cognito.CfnIdentityPool(this, "GuestIdentityPool", {
+      allowUnauthenticatedIdentities: true,
+      identityPoolName: "air-quality-guest-identity-pool",
+    });
+
+    const unauthenticatedRole = new iam.Role(this, "GuestIdentityPoolUnauthRole", {
+      assumedBy: new iam.FederatedPrincipal(
+        "cognito-identity.amazonaws.com",
+        {
+          StringEquals: {
+            "cognito-identity.amazonaws.com:aud": identityPool.ref,
+          },
+          "ForAnyValue:StringLike": {
+            "cognito-identity.amazonaws.com:amr": "unauthenticated",
+          },
+        },
+        "sts:AssumeRoleWithWebIdentity"
+      ),
+      description: "Unauthenticated role scoped to AppSync GraphQL calls only",
+    });
+
+    unauthenticatedRole.addToPolicy(
+      new iam.PolicyStatement({
+        actions: ["appsync:GraphQL"],
+        resources: [`${api.arn}/*`],
+      })
+    );
+
+    new cognito.CfnIdentityPoolRoleAttachment(this, "GuestIdentityPoolRoleAttachment", {
+      identityPoolId: identityPool.ref,
+      roles: {
+        unauthenticated: unauthenticatedRole.roleArn,
+      },
+    });
+
+    // Output API URL and guest identity pool settings
     new cdk.CfnOutput(this, "GraphQLApiUrl", {
       value: api.graphqlUrl,
       description: "The URL of your GraphQL API",
     });
 
-    new cdk.CfnOutput(this, "GraphQLApiKey", {
-      value: api.apiKey || "N/A",
-      description: "The API Key for your GraphQL API",
+    new cdk.CfnOutput(this, "GraphQLApiRegion", {
+      value: this.region,
+      description: "Region for AppSync and Cognito Identity Pool",
+    });
+
+    new cdk.CfnOutput(this, "GuestIdentityPoolId", {
+      value: identityPool.ref,
+      description: "Cognito Identity Pool ID for unauthenticated mobile access",
+    });
+
+    new cdk.CfnOutput(this, "GuestIdentityPoolUnauthRoleArn", {
+      value: unauthenticatedRole.roleArn,
+      description: "IAM role used by unauthenticated identities",
     });
   }
 }
