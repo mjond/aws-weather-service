@@ -98,4 +98,3 @@ export async function setCachedData(locationKey: string, data: AirQualityData): 
     console.error("Error writing to cache:", error);
   }
 }
-

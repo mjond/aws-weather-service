@@ -51,16 +51,15 @@ interface AppSyncEvent {
   };
 }
 
-type DayBuckets = Map<
-  string,
-  { pm10: number[]; pm25: number[]; usAqi: number[] }
->;
+type DayBuckets = Map<string, { pm10: number[]; pm25: number[]; usAqi: number[] }>;
 
 function isValidNumber(v: unknown): v is number {
   return typeof v === "number" && !Number.isNaN(v);
 }
 
-function aggregateHourlyToDailyForecast(hourly: NonNullable<OpenMeteoResponse["hourly"]>): DailyAirQualityForecastData[] {
+function aggregateHourlyToDailyForecast(
+  hourly: NonNullable<OpenMeteoResponse["hourly"]>
+): DailyAirQualityForecastData[] {
   const { time, pm10 = [], pm2_5 = [], us_aqi = [] } = hourly;
   const buckets: DayBuckets = new Map();
 
@@ -181,8 +180,7 @@ export const handler = async (event: AppSyncEvent): Promise<AirQualityData> => {
     return result;
   } catch (error) {
     console.error("Error fetching air quality data:", error);
-    throw new Error(
-      `Failed to fetch air quality data: ${error instanceof Error ? error.message : "Unknown error"}`
-    );
+    const message = error instanceof Error ? error.message : "Unknown error";
+    throw new Error(`Failed to fetch air quality data: ${message}`, { cause: error });
   }
 };

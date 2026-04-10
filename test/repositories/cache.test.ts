@@ -7,15 +7,15 @@ jest.mock("@aws-sdk/client-dynamodb", () => {
   };
 });
 
-// Create mock function using var for full hoisting
-// This will be initialized in the factory function
+// Create mock function using var for full hoisting (Jest + TS hoisting pattern)
+// eslint-disable-next-line no-var -- var is required for Jest mock hoisting with this pattern
 var mockSend: jest.Mock;
 
 jest.mock("@aws-sdk/lib-dynamodb", () => {
   const actual = jest.requireActual("@aws-sdk/lib-dynamodb");
   // Initialize the mock function - this is the same reference used everywhere
   mockSend = jest.fn();
-  
+
   return {
     ...actual,
     DynamoDBDocumentClient: {
@@ -59,7 +59,7 @@ describe("Cache Repository", () => {
 
   describe("createCacheKey", () => {
     it("should round coordinates to 2 decimal places", () => {
-      expect(createCacheKey(40.7128, -74.0060)).toBe("40.71,-74.01,7");
+      expect(createCacheKey(40.7128, -74.006)).toBe("40.71,-74.01,7");
     });
 
     it("should handle exact coordinates", () => {
@@ -71,7 +71,7 @@ describe("Cache Repository", () => {
     });
 
     it("should create same key for nearby coordinates", () => {
-      const key1 = createCacheKey(40.7128, -74.0060);
+      const key1 = createCacheKey(40.7128, -74.006);
       const key2 = createCacheKey(40.7129, -74.0061);
       expect(key1).toBe(key2);
     });
@@ -166,9 +166,7 @@ describe("Cache Repository", () => {
 
       mockSend.mockResolvedValue({});
 
-      const beforeTime = Math.floor(Date.now() / 1000);
       await setCachedData("40.71,-74.01,7", mockData);
-      const afterTime = Math.floor(Date.now() / 1000);
 
       expect(mockSend).toHaveBeenCalledTimes(1);
       // Verify the command type
@@ -190,4 +188,3 @@ describe("Cache Repository", () => {
     });
   });
 });
-

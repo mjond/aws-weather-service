@@ -43,14 +43,14 @@ describe("getAirQuality Lambda Handler", () => {
     arguments: {
       input: {
         latitude: 40.7128,
-        longitude: -74.0060,
+        longitude: -74.006,
       },
     },
   };
 
   const mockApiResponse = {
     latitude: 40.7128,
-    longitude: -74.0060,
+    longitude: -74.006,
     current: {
       time: "2024-01-01T12:00:00Z",
       interval: 900,
@@ -62,7 +62,7 @@ describe("getAirQuality Lambda Handler", () => {
 
   const baseExpected = {
     latitude: 40.7128,
-    longitude: -74.0060,
+    longitude: -74.006,
     current: {
       time: "2024-01-01T12:00:00Z",
       usAqi: 50,
@@ -108,7 +108,7 @@ describe("getAirQuality Lambda Handler", () => {
         ok: true,
         json: async () => ({
           latitude: 40.7128,
-          longitude: -74.0060,
+          longitude: -74.006,
         }),
       } as Response);
 
@@ -116,7 +116,7 @@ describe("getAirQuality Lambda Handler", () => {
 
       expect(result).toEqual({
         latitude: 40.7128,
-        longitude: -74.0060,
+        longitude: -74.006,
         current: undefined,
         forecast: undefined,
       });
@@ -172,7 +172,7 @@ describe("getAirQuality Lambda Handler", () => {
 
       await handler(mockEvent);
 
-      expect(mockCreateCacheKey).toHaveBeenCalledWith(40.7128, -74.0060, 7);
+      expect(mockCreateCacheKey).toHaveBeenCalledWith(40.7128, -74.006, 7);
     });
 
     it("should pass forecastDays through cache key and Open-Meteo request", async () => {
@@ -187,17 +187,15 @@ describe("getAirQuality Lambda Handler", () => {
         arguments: {
           input: {
             latitude: 40.7128,
-            longitude: -74.0060,
+            longitude: -74.006,
             forecastDays: 3,
           },
         },
       });
 
-      expect(mockCreateCacheKey).toHaveBeenCalledWith(40.7128, -74.0060, 3);
+      expect(mockCreateCacheKey).toHaveBeenCalledWith(40.7128, -74.006, 3);
       expect(mockGetCachedData).toHaveBeenCalledWith("40.71,-74.01,3");
-      expect(global.fetch).toHaveBeenCalledWith(
-        expect.stringContaining("forecast_days=3")
-      );
+      expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining("forecast_days=3"));
     });
   });
 
@@ -209,11 +207,7 @@ describe("getAirQuality Lambda Handler", () => {
         json: async () => ({
           ...mockApiResponse,
           hourly: {
-            time: [
-              "2024-01-01T08:00",
-              "2024-01-01T12:00",
-              "2024-01-02T10:00",
-            ],
+            time: ["2024-01-01T08:00", "2024-01-01T12:00", "2024-01-02T10:00"],
             pm10: [10, 20, 15],
             pm2_5: [5, 15, 10],
             us_aqi: [40, 80, 60],
@@ -243,9 +237,12 @@ describe("getAirQuality Lambda Handler", () => {
           usAqiHigh: 60,
         },
       ]);
-      expect(mockSetCachedData).toHaveBeenCalledWith("40.71,-74.01,7", expect.objectContaining({
-        forecast: result.forecast,
-      }));
+      expect(mockSetCachedData).toHaveBeenCalledWith(
+        "40.71,-74.01,7",
+        expect.objectContaining({
+          forecast: result.forecast,
+        })
+      );
     });
 
     it("should skip null hourly samples when computing min and max", async () => {
@@ -279,4 +276,3 @@ describe("getAirQuality Lambda Handler", () => {
     });
   });
 });
-

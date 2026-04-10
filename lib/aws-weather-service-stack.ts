@@ -32,24 +32,20 @@ export class AwsWeatherServiceStack extends cdk.Stack {
     });
 
     // Lambda function to fetch air quality data from Open-Meteo API
-    const getAirQualityLambda = new lambdaNodejs.NodejsFunction(
-      this,
-      "GetAirQualityFunction",
-      {
-        runtime: lambda.Runtime.NODEJS_20_X,
-        handler: "handler",
-        entry: path.join(__dirname, "../lambda/getAirQuality.ts"),
-        timeout: cdk.Duration.seconds(30),
-        memorySize: 256,
-        environment: {
-          CACHE_TABLE_NAME: cacheTable.tableName,
-          CACHE_TTL_SECONDS: "3600", // 1 hour cache expiration
-        },
-        bundling: {
-          forceDockerBundling: false,
-        },
-      }
-    );
+    const getAirQualityLambda = new lambdaNodejs.NodejsFunction(this, "GetAirQualityFunction", {
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: "handler",
+      entry: path.join(__dirname, "../lambda/getAirQuality.ts"),
+      timeout: cdk.Duration.seconds(30),
+      memorySize: 256,
+      environment: {
+        CACHE_TABLE_NAME: cacheTable.tableName,
+        CACHE_TTL_SECONDS: "3600", // 1 hour cache expiration
+      },
+      bundling: {
+        forceDockerBundling: false,
+      },
+    });
 
     // Grant Lambda permissions to read/write to DynamoDB cache table
     cacheTable.grantReadWriteData(getAirQualityLambda);
@@ -57,9 +53,7 @@ export class AwsWeatherServiceStack extends cdk.Stack {
     // AppSync GraphQL API
     const api = new appsync.GraphqlApi(this, "AirQualityApi", {
       name: "air-quality-api",
-      definition: appsync.Definition.fromFile(
-        path.join(__dirname, "../schema.graphql")
-      ),
+      definition: appsync.Definition.fromFile(path.join(__dirname, "../schema.graphql")),
       authorizationConfig: {
         defaultAuthorization: {
           authorizationType: appsync.AuthorizationType.IAM,
@@ -72,10 +66,7 @@ export class AwsWeatherServiceStack extends cdk.Stack {
     });
 
     // Connect Lambda as data source and create resolver
-    const lambdaDataSource = api.addLambdaDataSource(
-      "LambdaDataSource",
-      getAirQualityLambda
-    );
+    const lambdaDataSource = api.addLambdaDataSource("LambdaDataSource", getAirQualityLambda);
 
     lambdaDataSource.createResolver("GetAirQualityResolver", {
       typeName: "Query",
