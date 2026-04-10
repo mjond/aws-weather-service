@@ -6,7 +6,16 @@ import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as lambdaNodejs from "aws-cdk-lib/aws-lambda-nodejs";
+import * as wafv2 from "aws-cdk-lib/aws-wafv2";
 import * as path from "path";
+
+/**
+ * Per-IP rate limit before WAF blocks. AWS WAF minimum is 100.
+ * Keeps abuse from driving Lambda/AppSync/Open-Meteo usage.
+ */
+const WAF_RATE_LIMIT_PER_IP = 100;
+/** Seconds; must be 60, 120, 300, or 600. */
+const WAF_EVALUATION_WINDOW_SEC = 300;
 
 export class AwsWeatherServiceStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -109,6 +118,42 @@ export class AwsWeatherServiceStack extends cdk.Stack {
       },
     });
 
+    // Regional WAF: strict per-IP cap before AppSync (minimum WAF limit = 100 / 5 min).
+    const webAcl = new wafv2.CfnWebACL(this, "AirQualityApiWebAcl", {
+      name: `air-quality-api-waf-${this.stackName}`,
+      scope: "REGIONAL",
+      defaultAction: { allow: {} },
+      visibilityConfig: {
+        sampledRequestsEnabled: true,
+        cloudWatchMetricsEnabled: true,
+        metricName: "AirQualityApiWebAcl",
+      },
+      rules: [
+        {
+          name: "RateLimitPerIp",
+          priority: 0,
+          action: { block: {} },
+          statement: {
+            rateBasedStatement: {
+              aggregateKeyType: "IP",
+              limit: WAF_RATE_LIMIT_PER_IP,
+              evaluationWindowSec: WAF_EVALUATION_WINDOW_SEC,
+            },
+          },
+          visibilityConfig: {
+            sampledRequestsEnabled: true,
+            cloudWatchMetricsEnabled: true,
+            metricName: "RateLimitPerIp",
+          },
+        },
+      ],
+    });
+
+    new wafv2.CfnWebACLAssociation(this, "AirQualityApiWebAclAssociation", {
+      resourceArn: api.arn,
+      webAclArn: webAcl.attrArn,
+    });
+
     // Output API URL and guest identity pool settings
     new cdk.CfnOutput(this, "GraphQLApiUrl", {
       value: api.graphqlUrl,
@@ -128,6 +173,11 @@ export class AwsWeatherServiceStack extends cdk.Stack {
     new cdk.CfnOutput(this, "GuestIdentityPoolUnauthRoleArn", {
       value: unauthenticatedRole.roleArn,
       description: "IAM role used by unauthenticated identities",
+    });
+
+    new cdk.CfnOutput(this, "WafWebAclArn", {
+      value: webAcl.attrArn,
+      description: "Regional WAF Web ACL associated with AppSync",
     });
   }
 }
